@@ -22,14 +22,14 @@ public class DataLoader<U,I>{
 	Set<U> users = new HashSet<>();
     Set<I> items = new HashSet<>();
     List<Tuple3<U,I,Double>> triplets = new ArrayList<>();
-    List<Tuple2<U, I>> train = new ArrayList<>();
+    //List<Tuple2<U, I>> train = new ArrayList<>();
     int numrel = 0;
-    int num_train = 0;
-    int num_test = 0;
+    //int num_train = 0;
+    //int num_test = 0;
     DoubleUnaryOperator weightFunction;
     DoublePredicate relevance;
     
-    public DataLoader(boolean useRatings, int threshold) throws FileNotFoundException, IOException {
+    public DataLoader(boolean useRatings, int threshold) {
     	
     	weightFunction = useRatings ? (double x) -> x :
              (double x) -> (x >= threshold ? 1.0 : 0.0);
@@ -40,12 +40,16 @@ public class DataLoader<U,I>{
     }
     
     public void read(String input, Parser<U> parserUser, Parser<I> parserItem) throws FileNotFoundException, IOException {
+    	read(input, parserUser, parserItem, "\t");
+    }
+    
+    public void read(String input, Parser<U> parserUser, Parser<I> parserItem, String separator) throws FileNotFoundException, IOException {
     	try(BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(input))))
 	    {
 	        String line;
 	        while((line = br.readLine()) != null)
 	        {
-	        	String split[] = line.split("\t");
+	        	String split[] = line.split(separator);
 	            U user = parserUser.parse(split[0]);
 	            I item = parserItem.parse(split[1]);
 	            double val = Parsers.dp.parse(split[2]);
@@ -54,7 +58,7 @@ public class DataLoader<U,I>{
 	            items.add(item);
 	            
 	            double rating = weightFunction.applyAsDouble(val);
-	            
+	            /*
 	        	if (isTrain()) {
 		            num_train++;
 		            train.add(new Tuple2<>(user, item)); 
@@ -62,12 +66,29 @@ public class DataLoader<U,I>{
 	        	} else {
 	        		num_test++;
 	        	}
+	        	*/
 	            if(relevance.test(rating)) numrel++;
 	            
 	            triplets.add(new Tuple3<>(user, item, rating));     
 	        	
 	        }
 	    }
+    }
+    
+    public List<Tuple3<U,I,Double>> getRatings(){
+    	return this.triplets;
+    }
+    
+    public Set<U> getUsers() {
+    	return this.users;
+    }
+    
+    public Set<I> getItems() {
+    	return this.items;
+    }
+    
+    public int getRelevants() {
+    	return this.numrel;
     }
     
     public boolean isTrain() {
