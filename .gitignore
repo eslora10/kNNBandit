@@ -25,3 +25,17 @@ hs_err_pid*
 .idea/
 target/
 *.iml
+/bin/
+
+
+
+.classpath
+.ipynb_checkpoints/
+.project
+.settings/
+ratings_cm100k.txt
+res/
+res100.0.txt
+res100.txt
+resFails/
+results/

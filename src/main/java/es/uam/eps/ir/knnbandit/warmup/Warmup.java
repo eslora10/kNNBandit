@@ -4,24 +4,23 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
+import java.util.Optional;
 import org.jooq.lambda.tuple.Tuple3;
 import org.jooq.lambda.tuple.Tuple2;
 
 import es.uam.eps.ir.knnbandit.data.preference.index.fast.FastUpdateableItemIndex;
 import es.uam.eps.ir.knnbandit.data.preference.index.fast.FastUpdateableUserIndex;
-import es.uam.eps.ir.knnbandit.data.preference.index.fast.SimpleFastUpdateableItemIndex;
-import es.uam.eps.ir.knnbandit.data.preference.index.fast.SimpleFastUpdateableUserIndex;
 import es.uam.eps.ir.knnbandit.metrics.CumulativeMetric;
 import es.uam.eps.ir.knnbandit.metrics.CumulativeRecall;
 import es.uam.eps.ir.knnbandit.recommendation.InteractiveRecommender;
 import es.uam.eps.ir.knnbandit.recommendation.RecommendationLoop;
+import es.uam.eps.ir.ranksys.fast.preference.IdxPref;
 import es.uam.eps.ir.ranksys.fast.preference.SimpleFastPreferenceData;
 
-public abstract class Warmup<U, I> {
+public class Warmup<U, I> {
 	
 	List<Tuple3<U, I, Double>> ratings;
+	List<Double> results = new ArrayList<Double>();
 	int nRels;
 	double threshold = 0.5;
 	FastUpdateableUserIndex<U> uIndex;
@@ -31,18 +30,110 @@ public abstract class Warmup<U, I> {
 	RecommendationLoop<U, I> loop;
     Map<String, CumulativeMetric<U, I>> localMetrics = new HashMap<>();
     List<Tuple2<Integer, Integer>> trainData = new ArrayList<Tuple2<Integer, Integer>>();
+    boolean countFails = true;
 	
-	public Warmup(List<Tuple3<U, I, Double>> ratings, int nRels, Set<U> users, Set<I> items) {
-		this.ratings = ratings;
+	public Warmup(int nRels, SimpleFastPreferenceData<U, I> prefData, 
+			FastUpdateableUserIndex<U> uIndex, FastUpdateableItemIndex<I> iIndex, 
+			InteractiveRecommender<U, I> rec) {
 		this.nRels =  nRels;	
-        uIndex = SimpleFastUpdateableUserIndex.load(users.stream());
-        iIndex = SimpleFastUpdateableItemIndex.load(items.stream());
-        prefData = SimpleFastPreferenceData.load(ratings.stream(), uIndex, iIndex);
-        localMetrics.put("Cummulative recall", new CumulativeRecall<U,I>(prefData, nRels, threshold));
+        this.uIndex = uIndex;
+        this.iIndex = iIndex;
+        this.prefData = prefData;
+        this.rec = rec;
+        localMetrics.put("recall", new CumulativeRecall<U,I>(prefData, nRels, threshold));
 	}
 	
-	public abstract List<Tuple2<Integer, Integer>> perform(int iterations, boolean useRatings);
+	public Warmup(int nRels, SimpleFastPreferenceData<U, I> prefData, 
+			FastUpdateableUserIndex<U> uIndex, FastUpdateableItemIndex<I> iIndex, 
+			InteractiveRecommender<U, I> rec, boolean countFails) {
+		this(nRels,prefData, uIndex, iIndex, rec);
+		this.countFails = countFails;
+		
+	}
 	
-	public abstract List<Tuple2<Integer, Integer>> perform(double ratio, boolean useRatings);
+	public Double nextIteration() {
+		double ret; 
+		//StringBuilder builder = new StringBuilder();
+        //long aa = System.currentTimeMillis();
+        Tuple2<Integer, Integer> tuple = loop.nextIteration();
+        //long bb = System.currentTimeMillis();
+        if (tuple == null){
+            return null; // The loop has finished
+        }
+        results.add(loop.getMetrics().get("recall"));
+        Optional<IdxPref> value = this.prefData.getPreference(tuple.v1, tuple.v2);
+        /*
+        if(value.isPresent() && value.get().v2 >= threshold) {
+        	trainData.add(tuple);
+        	nRels--;
+        	return 1.0;
+        }
+        	
+        
+        if (countFails) {
+        	trainData.add(tuple);
+        }*/
+        if(value.isPresent() && value.get().v2 >= threshold) {
+        	nRels--;
+        	ret = 1.0;
+        } else {
+        	ret = 0.0;
+        }
+        
+        if (countFails || value.isPresent()) {
+        	trainData.add(tuple);
+        }
+        
+        return ret;
+        /*
+        int iter = loop.getCurrentIteration();
+        builder.append(iter);
+        builder.append("\t");
+        builder.append(tuple.v1);
+        builder.append("\t");
+        builder.append(tuple.v2);
+        Map<String, Double> metricVals = loop.getMetrics();
+        for (String name : metricNames){
+            builder.append("\t");
+            builder.append(metricVals.get(name));
+        }
+        builder.append("\t");
+        builder.append((bb - aa));
+        builder.append("\n");
+        bw.write(builder.toString());
+        */
+		
+	}
+	
+	public List<Tuple2<Integer, Integer>> perform(Integer iterations, boolean useRatings) {
+		loop = new RecommendationLoop<U, I>(uIndex, iIndex, prefData, rec, localMetrics, iterations, useRatings);
+        while (!loop.hasEnded()) {
+            Double rating = nextIteration();
+            if (rating == null) break;
+       }
+        
+        return trainData;
+        	
+    }
 
+	public List<Tuple2<Integer, Integer>> perform(Double ratio, boolean useRatings) {
+		int nIterations = (int) Math.ceil(ratio*nRels);
+		loop = new RecommendationLoop<U, I>(uIndex, iIndex, prefData, rec, localMetrics, 0, useRatings);
+		while (!loop.hasEnded() && nIterations > 0) {
+            Double rating = nextIteration();
+            if (rating == null) break;
+            if (rating > 0.0) nIterations--;
+		}
+		
+		return trainData;
+		
+	}
+	
+	public int getRelevants() {
+		return nRels;
+	}
+	
+	public  Map<String, CumulativeMetric<U, I>> getLocalMetrics(){
+		return localMetrics;
+	}
 }

@@ -7,17 +7,18 @@ import org.jooq.lambda.tuple.Tuple2;
 import es.uam.eps.ir.knnbandit.data.preference.index.fast.FastUpdateableItemIndex;
 import es.uam.eps.ir.knnbandit.data.preference.index.fast.FastUpdateableUserIndex;
 import es.uam.eps.ir.knnbandit.recommendation.RecommendationLoop;
-import es.uam.eps.ir.knnbandit.recommendation.basic.RandomRecommender;
+import es.uam.eps.ir.knnbandit.recommendation.basic.PopularityRecommender;
 import es.uam.eps.ir.ranksys.fast.preference.SimpleFastPreferenceData;
 
-public class RandomWarmup<U, I> extends Warmup<U, I> {
+public class PopularityWarmup<U, I> extends Warmup<U, I> {
 
-	public RandomWarmup(int nRels, SimpleFastPreferenceData<U, I> prefData, 
-			FastUpdateableUserIndex<U> uIndex, FastUpdateableItemIndex<I> iIndex) {
+	public PopularityWarmup(int nRels, SimpleFastPreferenceData<U, I> prefData, FastUpdateableUserIndex<U> uIndex,
+			FastUpdateableItemIndex<I> iIndex) {
 		super(nRels, prefData, uIndex, iIndex);
-		rec = new RandomRecommender<U, I>(uIndex, iIndex, prefData, true);
+		rec = new PopularityRecommender<U, I>(uIndex, iIndex, prefData, true, threshold);
+
 	}
-	
+
 	@Override
 	public List<Tuple2<Integer, Integer>> perform(int iterations, boolean useRatings) {
 		loop = new RecommendationLoop<U, I>(uIndex, iIndex, prefData, rec, localMetrics, iterations, useRatings);
@@ -41,7 +42,6 @@ public class RandomWarmup<U, I> extends Warmup<U, I> {
 		}
 		
 		return trainData;
-		
 	}
 
 }
