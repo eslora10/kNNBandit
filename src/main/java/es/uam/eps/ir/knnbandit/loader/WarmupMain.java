@@ -70,8 +70,6 @@ public class WarmupMain {
 			train = warmUp.perform(Integer.parseInt(args[2]), false);
 		}
 		
-		System.out.println("Train size: " + train.size());
-		
 		
 		//Beginning of exploit phase
 		nRels = warmUp.getRelevants();
@@ -88,7 +86,9 @@ public class WarmupMain {
         if(countFails) dir = "fails";
         else dir = "noFails";
         
-        BufferedWriter writer = new BufferedWriter(new FileWriter(dir+"/"+warmupAlg+"_"+exploitAlg+"_"+p+".txt"));
+        BufferedWriter writer = new BufferedWriter(new FileWriter(dir+"/"+warmupAlg+"/"+exploitAlg+"/"+p+".txt"));
+        
+        System.out.println(dir+"/"+warmupAlg+"/"+exploitAlg+"/"+p+".txt");
         while (!loop.hasEnded()) {
         	Tuple2<Integer, Integer> tuple = loop.nextIteration();
             //long bb = System.currentTimeMillis();
